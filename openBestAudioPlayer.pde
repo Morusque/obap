@@ -1,7 +1,7 @@
 
 import javax.swing.filechooser.FileSystemView;
 
-ArrayList<String> foldersToExplore = new ArrayList<String>();
+ArrayList<Directory> foldersToExplore = new ArrayList<Directory>();
 ArrayList<String> filesToPlay = new ArrayList<String>();
 
 import ddf.minim.*;
@@ -14,16 +14,13 @@ int currentPlayer = 0;
 float audioActionTimer = 5;
 
 void setup() {
-  size(500, 200);
+  size(700, 220);
   minim = new Minim(this);  
   String[] files = getDrives();
-  for (String f : files) foldersToExplore.add(f);
+  for (String f : files) foldersToExplore.add(new Directory(f, 1));
 }
 
 void draw() {
-  // println(foldersToExplore);
-  // println(filesToPlay);
-  // println("---");
   background(0);
   fill(0xFF);
   textSize(10);
@@ -40,7 +37,6 @@ void draw() {
     }
   }
   if (filesToPlay.size()>0) {
-    randomizeArrayList(filesToPlay);
     int nbFilesPlaying = 0;
     for (AudioPlayer p : player) if (p!=null) if (p.isPlaying()) nbFilesPlaying++;        
     if (audioActionTimer > 5 || nbFilesPlaying==0) {
@@ -69,17 +65,37 @@ void draw() {
 
 void exploreDeeper() {
   if (foldersToExplore.size()>0) {
-    randomizeArrayList(foldersToExplore);
-    String folder = foldersToExplore.remove(0);
+    float totalWeights = 0;
+    for (Directory f : foldersToExplore) totalWeights += f.weight;
+    float target = random(totalWeights);
+    totalWeights = 0;
+    int targetI=0;
+    for (int i=0; i<foldersToExplore.size(); i++) {
+      totalWeights += foldersToExplore.get(i).weight;
+      if (totalWeights>=target) {
+        targetI = i;
+        break;
+      }
+    }
+    Directory thisDirectory = foldersToExplore.remove(targetI);
+    float thisWeight = thisDirectory.weight;
+    String thisPath = thisDirectory.path;
     try {
-      String[][] discoveries = getAllFoldersAndFilesFrom(folder);
-      for (String f : discoveries[0]) foldersToExplore.add(f);
+      String[][] discoveries = getAllFoldersAndFilesFrom(thisPath);
+      float childrenWeight = thisWeight/max(1, discoveries[0].length);
+      for (String f : discoveries[0]) {
+        Directory newDir = new Directory(f, childrenWeight);
+        foldersToExplore.add(newDir);
+      }
+      int nbFilesAdded = 0;
       for (String f : discoveries[1]) {
         String extension = extension(f); 
         if (extension.equals(".wav")||extension.equals(".mp3")) {
           filesToPlay.add(f);
+          nbFilesAdded++;
         }
       }
+      if (nbFilesAdded>0) randomizeArrayList(filesToPlay);
     }
     catch(Exception e) {
       // println(e);
@@ -105,4 +121,13 @@ void exploreDeeper() {
 String extension (String e) {// TODO better
   if (e.length()<4) return "";
   return e.substring(e.length()-4, e.length()).toLowerCase();
+}
+
+class Directory {
+  String path;
+  float weight;
+  Directory(String path, float weight) {  
+    this.path = path;
+    this.weight = weight;
+  }
 }
