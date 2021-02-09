@@ -4,10 +4,11 @@ import javax.swing.filechooser.FileSystemView;
 ArrayList<Directory> foldersToExplore = new ArrayList<Directory>();
 ArrayList<String> filesToPlay = new ArrayList<String>();
 
-import ddf.minim.*;
+//import ddf.minim.*;
+import processing.sound.*;
 
-Minim minim;
-AudioPlayer[] player = new AudioPlayer[5];
+//Minim minim;
+SoundFile[] player = new SoundFile[5];
 String[] playerUrls = new String[5];
 int currentPlayer = 0;
 
@@ -15,7 +16,6 @@ float audioActionTimer = 5;
 
 void setup() {
   size(700, 220);
-  minim = new Minim(this);  
   String[] files = getDrives();
   for (String f : files) foldersToExplore.add(new Directory(f, 1));
 }
@@ -38,16 +38,17 @@ void draw() {
   }
   if (filesToPlay.size()>0) {
     int nbFilesPlaying = 0;
-    for (AudioPlayer p : player) if (p!=null) if (p.isPlaying()) nbFilesPlaying++;        
+    for (SoundFile p : player) if (p!=null) if (p.isPlaying()) nbFilesPlaying++;        
     if (audioActionTimer > 5 || nbFilesPlaying==0) {
       try {
-        if (player[currentPlayer]!=null) {
-          player[currentPlayer].pause();
-          player[currentPlayer].rewind();
-        }
+        if (player[currentPlayer]!=null) if (player[currentPlayer].isPlaying()) player[currentPlayer].pause();
         playerUrls[currentPlayer] = filesToPlay.remove(0);
-        player[currentPlayer] = minim.loadFile(playerUrls[currentPlayer]);
-        if (player[currentPlayer].length()!=-1) player[currentPlayer].skip(floor(random(player[currentPlayer].length())));
+        SoundFile newSF = new SoundFile(this, playerUrls[currentPlayer]);// false should be added to enable garbage collection
+        player[currentPlayer] = newSF;
+        if (player[currentPlayer].duration()!=-1) player[currentPlayer].cue(floor(random(player[currentPlayer].duration())));
+        if (player[currentPlayer].channels()==1) player[currentPlayer].pan(random(-1, 1));
+        if (random(1)<0.7) player[currentPlayer].rate(1);
+        else player[currentPlayer].rate(random(random(random(0, 2), 1), 1));
         player[currentPlayer].play();
         audioActionTimer = 0;
         currentPlayer = (currentPlayer+1)%player.length;
@@ -82,7 +83,7 @@ void exploreDeeper() {
     float thisWeight = thisDirectory.weight;
     String thisPath = thisDirectory.path;
     try {
-      String[][] discoveries = getAllFoldersAndFilesFrom(thisPath);
+      String[][] discoveries = getAllFoldersAndFilesMaxSizeFrom(thisPath, 20);
       float childrenWeight = thisWeight/max(1, discoveries[0].length);
       for (String f : discoveries[0]) {
         Directory newDir = new Directory(f, childrenWeight);
@@ -91,7 +92,7 @@ void exploreDeeper() {
       int nbFilesAdded = 0;
       for (String f : discoveries[1]) {
         String extension = extension(f); 
-        if (extension.equals(".wav")||extension.equals(".mp3")) {
+        if (extension.equals(".wav")||extension.equals(".mp3")||extension.equals("aif")||extension.equals("aiff")) {
           filesToPlay.add(f);
           nbFilesAdded++;
         }

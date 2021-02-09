@@ -63,6 +63,23 @@ String[][] getAllFoldersAndFilesFrom(String folderUrl) {
   return result;
 }
 
+String[][] getAllFoldersAndFilesMaxSizeFrom(String folderUrl, float limitMb) {
+  File folder = new File(folderUrl);
+  File[] filesPath = folder.listFiles();
+  ArrayList<String> folders = new ArrayList<String>();
+  ArrayList<String> files = new ArrayList<String>();
+  for (int i=0; i<filesPath.length; i++) {
+    if (filesPath[i].isDirectory()) folders.add(filesPath[i].toString());
+    else {
+      if (filesPath[i].length() / (1024 * 1024) <= limitMb) files.add(filesPath[i].toString());
+    }
+  }
+  String[][] result = new String[2][];
+  result[0] = folders.toArray(new String[folders.size()]);
+  result[1] = files.toArray(new String[files.size()]);
+  return result;
+}
+
 String[] getDrives() {
   File[] paths;
   // FileSystemView fsv = FileSystemView.getFileSystemView();
