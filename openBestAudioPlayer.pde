@@ -1,6 +1,4 @@
 
-import javax.swing.filechooser.FileSystemView;
-
 ArrayList<Directory> foldersToExplore = new ArrayList<Directory>();
 ArrayList<String> filesToPlay = new ArrayList<String>();
 
@@ -66,7 +64,7 @@ void draw() {
         players[currentPlayer].setKillOnEnd(true);
         players[currentPlayer].setPosition(random((float)players[0].getSample().getLength()));
         float rate = 1;
-        if (random(1)<0.2) rate = random(1, random(0, 2));
+        if (random(1)<0.3) rate = random(1, random(0, 2));
         if (random(1)<0.2) rate *= -1;
         players[currentPlayer].setRate(new Static(rate));
         panners[currentPlayer].clearInputConnections();
