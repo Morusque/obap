@@ -59,7 +59,8 @@ void draw() {
     for (SamplePlayer p : players) if (p!=null) if (!p.isPaused()&&!p.isDeleted()) nbFilesPlaying++;        
     if (audioActionTimer > 5 || nbFilesPlaying==0) {
       try {
-        if (players[currentPlayer]!=null) if (!players[currentPlayer].isPaused()&&!players[currentPlayer].isDeleted()) players[currentPlayer].kill();
+        System.gc();
+        if (players[currentPlayer]!=null) players[currentPlayer].kill();
         playerUrls[currentPlayer] = filesToPlay.remove(0);
         players[currentPlayer] = new SamplePlayer(SampleManager.sample(playerUrls[currentPlayer]));
         players[currentPlayer].setKillOnEnd(true);
