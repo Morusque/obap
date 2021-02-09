@@ -57,7 +57,8 @@ void draw() {
       }
     }
   } else {
-    while (filesToPlay.size()==0) exploreDeeper();
+    while (filesToPlay.size()==0&&foldersToExplore.size()>0) exploreDeeper();
+    if (foldersToExplore.size()==0) exit();
   }
   exploreDeeper();
   audioActionTimer += 1.0f/frameRate;
