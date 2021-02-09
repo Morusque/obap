@@ -4,12 +4,15 @@ import javax.swing.filechooser.FileSystemView;
 ArrayList<Directory> foldersToExplore = new ArrayList<Directory>();
 ArrayList<String> filesToPlay = new ArrayList<String>();
 
-//import ddf.minim.*;
-import processing.sound.*;
+import beads.*;
+import java.util.Arrays; 
 
-//Minim minim;
-SoundFile[] player = new SoundFile[5];
-String[] playerUrls = new String[5];
+AudioContext ac;
+int nbPlayers = 5;
+SamplePlayer[] players = new SamplePlayer[nbPlayers];
+Panner[] panners = new Panner[nbPlayers];
+String[] playerUrls = new String[nbPlayers];
+
 int currentPlayer = 0;
 
 float audioActionTimer = 5;
@@ -18,19 +21,34 @@ void setup() {
   size(700, 220);
   String[] files = getDrives();
   for (String f : files) foldersToExplore.add(new Directory(f, 1));
+  ac = AudioContext.getDefaultContext();
+  Gain g = new Gain(2, 0.5);
+  ac.out.addInput(g);
+  for (int i=0; i<nbPlayers; i++) {
+    panners[i] = new Panner(ac, 0);
+    g.addInput(panners[i]);
+  }
+  ac.start();
 }
 
 void draw() {
   background(0);
+  stroke(0x50);
+  for (int i = 0; i < width; i++) {
+    int buffIndex = i * ac.getBufferSize() / width;
+    int vOffset = (int)((1 + ac.out.getValue(0, buffIndex)) * height / 2);
+    vOffset = min(vOffset, height);
+    point(i, vOffset);
+  }  
   fill(0xFF);
   textSize(10);
   text("exploring "+foldersToExplore.size()+" folders", 20, 30);
   text("found "+filesToPlay.size()+" audio files", 20, 50);
   text("sounds currently playing : ", 20, 70);
   int currentY = 90;
-  for (int i=0; i<player.length; i++) {
-    if (player[i]!=null) {
-      if (player[i].isPlaying()) {
+  for (int i=0; i<nbPlayers; i++) {
+    if (players[i]!=null) {
+      if (!players[i].isPaused()&&!players[i].isDeleted()) {
         text("   "+playerUrls[i], 20, currentY);
         currentY+=20;
       }
@@ -38,20 +56,23 @@ void draw() {
   }
   if (filesToPlay.size()>0) {
     int nbFilesPlaying = 0;
-    for (SoundFile p : player) if (p!=null) if (p.isPlaying()) nbFilesPlaying++;        
+    for (SamplePlayer p : players) if (p!=null) if (!p.isPaused()&&!p.isDeleted()) nbFilesPlaying++;        
     if (audioActionTimer > 5 || nbFilesPlaying==0) {
       try {
-        if (player[currentPlayer]!=null) if (player[currentPlayer].isPlaying()) player[currentPlayer].pause();
+        if (players[currentPlayer]!=null) if (!players[currentPlayer].isPaused()&&!players[currentPlayer].isDeleted()) players[currentPlayer].kill();
         playerUrls[currentPlayer] = filesToPlay.remove(0);
-        SoundFile newSF = new SoundFile(this, playerUrls[currentPlayer]);// false should be added to enable garbage collection
-        player[currentPlayer] = newSF;
-        if (player[currentPlayer].duration()!=-1) player[currentPlayer].cue(floor(random(player[currentPlayer].duration())));
-        if (player[currentPlayer].channels()==1) player[currentPlayer].pan(random(-1, 1));
-        if (random(1)<0.7) player[currentPlayer].rate(1);
-        else player[currentPlayer].rate(random(random(random(0, 2), 1), 1));
-        player[currentPlayer].play();
+        players[currentPlayer] = new SamplePlayer(SampleManager.sample(playerUrls[currentPlayer]));
+        players[currentPlayer].setKillOnEnd(true);
+        players[currentPlayer].setPosition(random((float)players[0].getSample().getLength()));
+        float rate = 1;
+        if (random(1)<0.2) rate = random(1, random(0, 2));
+        if (random(1)<0.2) rate *= -1;
+        players[currentPlayer].setRate(new Static(rate));
+        panners[currentPlayer].clearInputConnections();
+        panners[currentPlayer].addInput(players[currentPlayer]);
+        panners[currentPlayer].setPos(random(-1, 1));
         audioActionTimer = 0;
-        currentPlayer = (currentPlayer+1)%player.length;
+        currentPlayer = (currentPlayer+1)%nbPlayers;
       }
       catch(Exception e) {
         println(e);
@@ -92,7 +113,7 @@ void exploreDeeper() {
       int nbFilesAdded = 0;
       for (String f : discoveries[1]) {
         String extension = extension(f); 
-        if (extension.equals(".wav")||extension.equals(".mp3")||extension.equals("aif")||extension.equals("aiff")) {
+        if (extension.equals("wav")||extension.equals("mp3")||extension.equals("aif")||extension.equals("aiff")||extension.equals("ogg")||extension.equals("flac")) {
           filesToPlay.add(f);
           nbFilesAdded++;
         }
@@ -120,9 +141,13 @@ void exploreDeeper() {
   for (T a : a2) as.add(a);
 }
 
-String extension (String e) {// TODO better
-  if (e.length()<4) return "";
-  return e.substring(e.length()-4, e.length()).toLowerCase();
+String extension (String e) {
+  int pos = e.length()-1;
+  while (pos>0) {
+    if (e.charAt(pos)=='.') return e.substring(pos+1, e.length()).toLowerCase();
+    pos--;
+  }
+  return "";
 }
 
 class Directory {
