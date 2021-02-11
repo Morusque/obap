@@ -225,3 +225,27 @@ color average(final PImage img) {
   b /= img.pixels.length;
   return color((int)r, (int)g, (int)b);
 }
+
+<T> void randomizeArray(T[] as) {
+  ArrayList<T> a1 = new ArrayList<T>();
+  ArrayList<T> a2 = new ArrayList<T>();
+  for (T a : as) a1.add(a);
+
+  while (a1.size()>0) a2.add(a1.remove(floor(random(a1.size()))));
+  for (int i=0; i<as.length; i++) as[i]=a2.get(i);
+}
+
+<T> void randomizeArrayList(ArrayList<T> as) {
+  ArrayList<T> a2 = new ArrayList<T>();
+  while (as.size()>0) a2.add(as.remove(floor(random(as.size()))));
+  for (T a : a2) as.add(a);
+}
+
+String extension (String e) {
+  int pos = e.length()-1;
+  while (pos>0) {
+    if (e.charAt(pos)=='.') return e.substring(pos+1, e.length()).toLowerCase();
+    pos--;
+  }
+  return "";
+}

@@ -13,7 +13,7 @@ String[] playerUrls = new String[nbPlayers];
 
 int currentPlayer = 0;
 
-float audioActionTimer = 5;
+long nextPlayTime = 0;
 
 int activeThread = 0;
 // 0 = -> explore
@@ -21,15 +21,21 @@ int activeThread = 0;
 // 2 = -> play
 // 3 = playing
 
+ArrayList<String> playedLog = new ArrayList<String>();
+
 void setup() {
   size(700, 220);
+  frameRate(30);
   String[] files = getDrives();
   for (String f : files) foldersToExplore.add(new Directory(f, 1));
   ac = AudioContext.getDefaultContext();
   Gain g = new Gain(2, 0.5);
   ac.out.addInput(g);
   for (int i=0; i<nbPlayers; i++) {
+    players[i] = new SamplePlayer(ac, 2);
     panners[i] = new Panner(ac, 0);
+    // panners[currentPlayer].clearInputConnections();
+    panners[i].addInput(players[i]);
     g.addInput(panners[i]);
   }
   ac.start();
@@ -46,17 +52,13 @@ void draw() {
   }  
   fill(0xFF);
   textSize(10);
-  text("exploring "+foldersToExplore.size()+" folders", 20, 30);
-  text("found "+filesToPlay.size()+" audio files", 20, 50);
-  text("sounds currently playing : ", 20, 70);
+  text(""+foldersToExplore.size()+" folders to explore", 20, 30);
+  text(""+filesToPlay.size()+" files to play", 20, 50);
+  text("play log : ", 20, 70);
   int currentY = 90;
-  for (int i=0; i<nbPlayers; i++) {
-    if (players[i]!=null) {
-      if (!players[i].isPaused()&&!players[i].isDeleted()) {
-        text("   "+playerUrls[i], 20, currentY);
-        currentY+=20;
-      }
-    }
+  for (int i=playedLog.size()-1; i>=0; i--) {
+    text("   "+playedLog.get(i), 20, currentY);
+    currentY+=20;
   }
   if (activeThread==0) {
     activeThread=1;
@@ -66,11 +68,10 @@ void draw() {
     activeThread=3;
     thread("playSomething");
   }
-  audioActionTimer += 1.0f/frameRate;
 }
 
 void exploreDeeper() {
-  if (foldersToExplore.size()>0) {
+  if (foldersToExplore.size()>0 && filesToPlay.size()<1000) {
     float totalWeights = 0;
     for (Directory f : foldersToExplore) totalWeights += f.weight;
     float target = random(totalWeights);
@@ -93,45 +94,39 @@ void exploreDeeper() {
         Directory newDir = new Directory(f, childrenWeight);
         foldersToExplore.add(newDir);
       }
-      int nbFilesAdded = 0;
       for (String f : discoveries[1]) {
         String extension = extension(f); 
-        if (extension.equals("wav")||extension.equals("mp3")||extension.equals("aif")||extension.equals("aiff")||extension.equals("ogg")||extension.equals("flac")) {
+        if (extension.equals("wav")||extension.equals("mp3")||extension.equals("aif")||extension.equals("aiff")||extension.equals("flac")) {//||extension.equals("ogg") 
           filesToPlay.add(f);
-          nbFilesAdded++;
         }
       }
-      if (nbFilesAdded>0) randomizeArrayList(filesToPlay);
     }
     catch(Exception e) {
       // println(e);
     }
-  } else {
-    exit();
   }
+  if (foldersToExplore.size()+filesToPlay.size()==0) exit();
   activeThread = 2;
 }
 
 void playSomething() {
   if (filesToPlay.size()>0) {
-    int nbFilesPlaying = 0;
-    for (SamplePlayer p : players) if (p!=null) if (!p.isPaused()&&!p.isDeleted()) nbFilesPlaying++;        
-    if (audioActionTimer > 5 || nbFilesPlaying==0) {
+    if (millis()>=nextPlayTime) {
       try {
         System.gc();
-        if (players[currentPlayer]!=null) players[currentPlayer].kill();
-        playerUrls[currentPlayer] = filesToPlay.remove(0);
-        players[currentPlayer] = new SamplePlayer(SampleManager.sample(playerUrls[currentPlayer]));
-        players[currentPlayer].setKillOnEnd(true);
-        players[currentPlayer].setPosition(random((float)players[0].getSample().getLength()));
+        players[currentPlayer].pause(true);
+        playerUrls[currentPlayer] = filesToPlay.remove(floor(random(filesToPlay.size())));
+        players[currentPlayer].setSample(SampleManager.sample(playerUrls[currentPlayer]));
+        players[currentPlayer].setKillOnEnd(false);
         float rate = 1;
         if (random(1)<0.3) rate = random(1, random(0, 2));
         if (random(1)<0.2) rate *= -1;
         players[currentPlayer].setRate(new Static(rate));
-        panners[currentPlayer].clearInputConnections();
-        panners[currentPlayer].addInput(players[currentPlayer]);
         panners[currentPlayer].setPos(random(-1, 1));
-        audioActionTimer = 0;
+        players[currentPlayer].start(random((float)players[currentPlayer].getSample().getLength()));
+        nextPlayTime = floor(millis()+random(100, 10000));
+        playedLog.add(playerUrls[currentPlayer]);
+        while (playedLog.size()>5) playedLog.remove(0);
         currentPlayer = (currentPlayer+1)%nbPlayers;
       }
       catch(Exception e) {
@@ -139,32 +134,7 @@ void playSomething() {
       }
     }
   }
-  // while (filesToPlay.size()==0&&foldersToExplore.size()>0) exploreDeeper();
   activeThread = 0;
-}
-
-<T> void randomizeArray(T[] as) {
-  ArrayList<T> a1 = new ArrayList<T>();
-  ArrayList<T> a2 = new ArrayList<T>();
-  for (T a : as) a1.add(a);
-
-  while (a1.size()>0) a2.add(a1.remove(floor(random(a1.size()))));
-  for (int i=0; i<as.length; i++) as[i]=a2.get(i);
-}
-
-<T> void randomizeArrayList(ArrayList<T> as) {
-  ArrayList<T> a2 = new ArrayList<T>();
-  while (as.size()>0) a2.add(as.remove(floor(random(as.size()))));
-  for (T a : a2) as.add(a);
-}
-
-String extension (String e) {
-  int pos = e.length()-1;
-  while (pos>0) {
-    if (e.charAt(pos)=='.') return e.substring(pos+1, e.length()).toLowerCase();
-    pos--;
-  }
-  return "";
 }
 
 class Directory {
