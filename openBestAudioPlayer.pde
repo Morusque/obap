@@ -56,9 +56,11 @@ void draw() {
   text(""+filesToPlay.size()+" files to play", 20, 50);
   text("play log : ", 20, 70);
   int currentY = 90;
-  for (int i=playedLog.size()-1; i>=0; i--) {
-    text("   "+playedLog.get(i), 20, currentY);
-    currentY+=20;
+  for (int i=0; i<players.length; i++) {
+    if (playerUrls[i]!=null&&!players[i].isDeleted()) {
+      text("   "+playerUrls[i], 20, currentY);
+      currentY+=20;
+    }
   }
   if (activeThread==0) {
     activeThread=1;
@@ -113,16 +115,19 @@ void playSomething() {
   if (filesToPlay.size()>0) {
     if (millis()>=nextPlayTime) {
       try {
-        System.gc();
         players[currentPlayer].pause(true);
+        if (players[currentPlayer].getSample()!=null) players[currentPlayer].getSample().clear();
+        players[currentPlayer].kill();
         playerUrls[currentPlayer] = filesToPlay.remove(floor(random(filesToPlay.size())));
-        players[currentPlayer].setSample(SampleManager.sample(playerUrls[currentPlayer]));
-        players[currentPlayer].setKillOnEnd(false);
+        players[currentPlayer] = new SamplePlayer(SampleManager.sample(playerUrls[currentPlayer]));
+        players[currentPlayer].setKillOnEnd(true);
         float rate = 1;
         if (random(1)<0.3) rate = random(1, random(0, 2));
         if (random(1)<0.2) rate *= -1;
         players[currentPlayer].setRate(new Static(rate));
         panners[currentPlayer].setPos(random(-1, 1));
+        panners[currentPlayer].clearInputConnections();
+        panners[currentPlayer].addInput(players[currentPlayer]);
         players[currentPlayer].start(random((float)players[currentPlayer].getSample().getLength()));
         nextPlayTime = floor(millis()+random(100, 10000));
         playedLog.add(playerUrls[currentPlayer]);
