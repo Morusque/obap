@@ -6,12 +6,8 @@ import beads.*;
 import java.util.Arrays; 
 
 AudioContext ac;
-int nbPlayers = 5;
-SamplePlayer[] players = new SamplePlayer[nbPlayers];
-Panner[] panners = new Panner[nbPlayers];
-String[] playerUrls = new String[nbPlayers];
-
-int currentPlayer = 0;
+ArrayList<Player> players = new ArrayList<Player>();
+Gain gain = new Gain(2, 0.5);
 
 long nextPlayTime = 0;
 
@@ -21,23 +17,13 @@ int activeThread = 0;
 // 2 = -> play
 // 3 = playing
 
-ArrayList<String> playedLog = new ArrayList<String>();
-
 void setup() {
   size(700, 220);
   frameRate(30);
   String[] files = getDrives();
   for (String f : files) foldersToExplore.add(new Directory(f, 1));
   ac = AudioContext.getDefaultContext();
-  Gain g = new Gain(2, 0.5);
-  ac.out.addInput(g);
-  for (int i=0; i<nbPlayers; i++) {
-    players[i] = new SamplePlayer(ac, 2);
-    panners[i] = new Panner(ac, 0);
-    // panners[currentPlayer].clearInputConnections();
-    panners[i].addInput(players[i]);
-    g.addInput(panners[i]);
-  }
+  ac.out.addInput(gain);
   ac.start();
 }
 
@@ -56,9 +42,9 @@ void draw() {
   text(""+filesToPlay.size()+" files to play", 20, 50);
   text("play log : ", 20, 70);
   int currentY = 90;
-  for (int i=0; i<players.length; i++) {
-    if (playerUrls[i]!=null&&!players[i].isDeleted()) {
-      text("   "+playerUrls[i], 20, currentY);
+  for (int i=0; i<players.size(); i++) {
+    if (players.get(i).isPlaying()) {
+      text("   "+players.get(i).url, 20, currentY);
       currentY+=20;
     }
   }
@@ -115,24 +101,12 @@ void playSomething() {
   if (filesToPlay.size()>0) {
     if (millis()>=nextPlayTime) {
       try {
-        players[currentPlayer].pause(true);
-        if (players[currentPlayer].getSample()!=null) players[currentPlayer].getSample().clear();
-        players[currentPlayer].kill();
-        playerUrls[currentPlayer] = filesToPlay.remove(floor(random(filesToPlay.size())));
-        players[currentPlayer] = new SamplePlayer(SampleManager.sample(playerUrls[currentPlayer]));
-        players[currentPlayer].setKillOnEnd(true);
-        float rate = 1;
-        if (random(1)<0.3) rate = random(1, random(0, 2));
-        if (random(1)<0.2) rate *= -1;
-        players[currentPlayer].setRate(new Static(rate));
-        panners[currentPlayer].setPos(random(-1, 1));
-        panners[currentPlayer].clearInputConnections();
-        panners[currentPlayer].addInput(players[currentPlayer]);
-        players[currentPlayer].start(random((float)players[currentPlayer].getSample().getLength()));
+        players.add(new Player());
+        if (players.size()>5) {
+          players.get(0).delete();
+          players.remove(0);
+        }
         nextPlayTime = floor(millis()+random(100, 10000));
-        playedLog.add(playerUrls[currentPlayer]);
-        while (playedLog.size()>5) playedLog.remove(0);
-        currentPlayer = (currentPlayer+1)%nbPlayers;
       }
       catch(Exception e) {
         println(e);
@@ -148,5 +122,40 @@ class Directory {
   Directory(String path, float weight) {  
     this.path = path;
     this.weight = weight;
+  }
+}
+
+class Player {
+  SamplePlayer player;
+  Panner panner;
+  String url;
+  Player() {
+    url = filesToPlay.remove(floor(random(filesToPlay.size())));
+    player = new SamplePlayer(SampleManager.sample(url));
+    panner = new Panner(ac, 0);
+    panner.setPos(random(-1, 1));
+    panner.addInput(player);
+    player.setKillOnEnd(true);
+    float rate = 1;
+    if (random(1)<0.3) rate = random(1, random(0, 2));
+    if (random(1)<0.2) rate *= -1;
+    player.setRate(new Static(rate));
+    player.start(random((float)player.getSample().getLength()));
+    panner.addInput(player);
+    gain.addInput(panner);
+  }
+  void delete() {
+    player.pause(true);
+    if (player.getSample()!=null) player.getSample().clear();
+    panner.kill();
+    player.kill();
+    panner.clearDependents();
+    player.clearDependents();
+    gain.clearDependents();
+  }
+  boolean isPlaying() {
+    if (player.isDeleted()) return false;
+    if (url == null) return false;
+    return true;
   }
 }
