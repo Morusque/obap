@@ -56,6 +56,10 @@ void draw() {
     activeThread=3;
     thread("playSomething");
   }
+
+  //println("---");
+  //ac.printCallChain();
+  //SampleManager.printSampleList();
 }
 
 void exploreDeeper() {
@@ -105,6 +109,7 @@ void playSomething() {
         if (players.size()>5) {
           players.get(0).delete();
           players.remove(0);
+          System.gc();
         }
         nextPlayTime = floor(millis()+random(100, 10000));
       }
@@ -146,12 +151,14 @@ class Player {
   }
   void delete() {
     player.pause(true);
-    if (player.getSample()!=null) player.getSample().clear();
+    if (player.getSample()!=null) {
+      SampleManager.removeSample(player.getSample());
+      player.getSample().clear();
+    }
+    gain.removeAllConnections(panner);
+    panner.removeAllConnections(player);
     panner.kill();
     player.kill();
-    panner.clearDependents();
-    player.clearDependents();
-    gain.clearDependents();
   }
   boolean isPlaying() {
     if (player.isDeleted()) return false;
