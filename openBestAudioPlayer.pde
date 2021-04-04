@@ -7,7 +7,6 @@ import java.util.Arrays;
 
 AudioContext ac;
 ArrayList<Player> players = new ArrayList<Player>();
-Gain gain = new Gain(2, 0.5);
 
 long nextPlayTime = 0;
 
@@ -23,7 +22,6 @@ void setup() {
   String[] files = getDrives();
   for (String f : files) foldersToExplore.add(new Directory(f, 1));
   ac = AudioContext.getDefaultContext();
-  ac.out.addInput(gain);
   ac.start();
 }
 
@@ -87,8 +85,8 @@ void exploreDeeper() {
         foldersToExplore.add(newDir);
       }
       for (String f : discoveries[1]) {
-        String extension = extension(f); 
-        if (extension.equals("wav")||extension.equals("mp3")||extension.equals("aif")||extension.equals("aiff")||extension.equals("flac")) {//||extension.equals("ogg") 
+        String extension = extension(f);
+        if (extension.equals("wav")||extension.equals("aif")||extension.equals("aiff")||extension.equals("flac")) {//||extension.equals("ogg")||extension.equals("mp3")
           filesToPlay.add(f);
         }
       }
@@ -108,7 +106,6 @@ void playSomething() {
         players.add(new Player());
         if (players.size()>5) {
           players.get(0).delete();
-          players.remove(0);
           System.gc();
         }
         nextPlayTime = floor(millis()+random(100, 10000));
@@ -133,21 +130,24 @@ class Directory {
 class Player {
   SamplePlayer player;
   Panner panner;
+  Gain gain;
   String url;
   Player() {
     url = filesToPlay.remove(floor(random(filesToPlay.size())));
     player = new SamplePlayer(SampleManager.sample(url));
     panner = new Panner(ac, 0);
+    gain = new Gain(2, 0.5);
     panner.setPos(random(-1, 1));
     panner.addInput(player);
     player.setKillOnEnd(true);
     float rate = 1;
-    if (random(1)<0.3) rate = random(1, random(0, 2));
-    if (random(1)<0.2) rate *= -1;
+    if (random(1.0f)<0.3f) rate = random(1.0f, random(0.0f, 2.0f));
+    if (random(1.0f)<0.2f) rate *= -1;
     player.setRate(new Static(rate));
-    player.start(random((float)player.getSample().getLength()));
     panner.addInput(player);
     gain.addInput(panner);
+    ac.out.addInput(gain);
+    player.start(random((float)player.getSample().getLength()));
   }
   void delete() {
     player.pause(true);
@@ -155,10 +155,13 @@ class Player {
       SampleManager.removeSample(player.getSample());
       player.getSample().clear();
     }
-    gain.removeAllConnections(panner);
-    panner.removeAllConnections(player);
+    player.removeAllConnections(panner);
+    panner.removeAllConnections(gain);
+    gain.removeAllConnections(ac.out);
     panner.kill();
     player.kill();
+    gain.kill();
+    players.remove(this);
   }
   boolean isPlaying() {
     if (player.isDeleted()) return false;
