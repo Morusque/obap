@@ -86,7 +86,7 @@ void exploreDeeper() {
       }
       for (String f : discoveries[1]) {
         String extension = extension(f);
-        if (extension.equals("wav")||extension.equals("aif")||extension.equals("aiff")||extension.equals("flac")) {//||extension.equals("ogg")||extension.equals("mp3")
+        if (extension.equals("wav")||extension.equals("aif")||extension.equals("aiff")||extension.equals("flac")||extension.equals("mp3")) {//||extension.equals("ogg")
           filesToPlay.add(f);
         }
       }
