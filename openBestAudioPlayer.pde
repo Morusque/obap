@@ -1,20 +1,28 @@
 
+import drop.*;
+
+SDrop drop;
+
 ArrayList<Directory> foldersToExplore = new ArrayList<Directory>();
 ArrayList<String> filesToPlay = new ArrayList<String>();
 
 import beads.*;
-import java.util.Arrays; 
+import java.util.Arrays;
 
 AudioContext ac;
 ArrayList<Player> players = new ArrayList<Player>();
 
 long nextPlayTime = 0;
 
+File droppedFile = null;
+
 int activeThread = 0;
 // 0 = -> explore
 // 1 = exploring
 // 2 = -> play
 // 3 = playing
+// 4 = -> check
+// 5 = check droppedFile
 
 void setup() {
   size(700, 220);
@@ -23,6 +31,7 @@ void setup() {
   for (String f : files) foldersToExplore.add(new Directory(f, 1));
   ac = AudioContext.getDefaultContext();
   ac.start();
+  drop = new SDrop(this);
 }
 
 void draw() {
@@ -33,11 +42,13 @@ void draw() {
     int vOffset = (int)((1 + ac.out.getValue(0, buffIndex)) * height / 2);
     vOffset = min(vOffset, height);
     point(i, vOffset);
-  }  
+  }
   fill(0xFF);
   textSize(10);
-  text(""+foldersToExplore.size()+" folders to explore", 20, 30);
-  text(""+filesToPlay.size()+" files to play", 20, 50);
+  if (droppedFile==null) {
+    text(""+foldersToExplore.size()+" folders to explore", 20, 30);
+    text(""+filesToPlay.size()+" files to play", 20, 50);
+  }
   text("play log : ", 20, 70);
   int currentY = 90;
   for (int i=0; i<players.size(); i++) {
@@ -46,6 +57,7 @@ void draw() {
       currentY+=20;
     }
   }
+
   if (activeThread==0) {
     activeThread=1;
     thread("exploreDeeper");
@@ -53,6 +65,10 @@ void draw() {
   if (activeThread==2) {
     activeThread=3;
     thread("playSomething");
+  }
+  if (activeThread==4) {
+    activeThread=5;
+    thread("handleDroppedFile");
   }
 
   //println("---");
@@ -115,13 +131,13 @@ void playSomething() {
       }
     }
   }
-  activeThread = 0;
+  activeThread = 4;
 }
 
 class Directory {
   String path;
   float weight;
-  Directory(String path, float weight) {  
+  Directory(String path, float weight) {
     this.path = path;
     this.weight = weight;
   }
@@ -168,4 +184,31 @@ class Player {
     if (url == null) return false;
     return true;
   }
+}
+
+void dropEvent(DropEvent theDropEvent) {
+  if (theDropEvent.isFile()) {
+    droppedFile = theDropEvent.file();
+  }
+}
+
+void handleDroppedFile() {
+  if (droppedFile != null) {
+    if (droppedFile.isDirectory()) {
+      while (players.size()>0) {
+        players.get(0).delete();
+        System.gc();
+      }
+      foldersToExplore.clear();
+      filesToPlay.clear();
+      foldersToExplore.add(new Directory(droppedFile.getAbsolutePath(), 1));
+    } else {
+      String extension = extension(droppedFile.getAbsolutePath());
+      if (extension.equals("wav")||extension.equals("aif")||extension.equals("aiff")||extension.equals("flac")||extension.equals("mp3")) {//||extension.equals("ogg")
+        filesToPlay.add(droppedFile.getAbsolutePath());
+      }
+    }
+    droppedFile = null;
+  }
+  activeThread = 0;
 }
